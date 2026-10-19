@@ -1,0 +1,1452 @@
+<html lang="id" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>smartbit - Micro:bit Dashboard Controller</title>
+    
+    <!-- TensorFlow.js & Teachable Machine Image Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+
+    <style>
+        /* ==========================================================================
+           1. VARIABLE & THEME CONFIGURATION
+           ========================================================================== */
+        :root {
+            /* Light Theme (Default Image Style) */
+            --bg-body: #F3F5F9;
+            --sidebar-bg: #111827;
+            --sidebar-text: #9CA3AF;
+            --sidebar-text-active: #FFFFFF;
+            --sidebar-active-bg: #1D4ED8;
+            
+            --card-bg: #FFFFFF;
+            --card-border: #E5E7EB;
+            --text-main: #1F2937;
+            --text-muted: #6B7280;
+            
+            --primary: #2563EB;
+            --primary-hover: #1D4ED8;
+            --danger: #EF4444;
+            --danger-hover: #DC2626;
+            --success: #10B981;
+            --warning: #F59E0B;
+            
+            --console-bg: #18191E;
+            --console-text: #D1D5DB;
+            --console-input-bg: #272932;
+            
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        [data-theme="dark"] {
+            /* Dark Theme Variables */
+            --bg-body: #0F172A;
+            --sidebar-bg: #0B0F19;
+            --sidebar-text: #64748B;
+            --sidebar-text-active: #FFFFFF;
+            --sidebar-active-bg: #2563EB;
+            
+            --card-bg: #1E293B;
+            --card-border: #334155;
+            --text-main: #F8FAFC;
+            --text-muted: #94A3B8;
+            
+            --console-bg: #090D16;
+            --console-text: #CBD5E1;
+            --console-input-bg: #1E293B;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+        }
+
+        body {
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ==========================================================================
+           2. SIDEBAR NAVIGATION
+           ========================================================================== */
+        .sidebar {
+            width: 250px;
+            background-color: var(--sidebar-bg);
+            display: flex;
+            flex-direction: column;
+            padding: 24px 16px;
+            flex-shrink: 0;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #FFFFFF;
+            font-size: 1.35rem;
+            font-weight: 700;
+            margin-bottom: 36px;
+            padding-left: 8px;
+        }
+
+        .brand-icon {
+            width: 32px;
+            height: 32px;
+            background: #2563EB;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .nav-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            list-style: none;
+        }
+
+        .nav-item button {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            border: none;
+            background: transparent;
+            color: var(--sidebar-text);
+            font-size: 0.95rem;
+            font-weight: 500;
+            border-radius: 10px;
+            cursor: pointer;
+            text-align: left;
+        }
+
+        .nav-item button:hover {
+            color: #FFFFFF;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .nav-item.active button {
+            background-color: var(--sidebar-active-bg);
+            color: var(--sidebar-text-active);
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+
+        .nav-icon {
+            font-size: 1.1rem;
+            width: 20px;
+            display: inline-block;
+            text-align: center;
+        }
+
+        /* ==========================================================================
+           3. MAIN LAYOUT & HEADER
+           ========================================================================== */
+        .main-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .top-header {
+            height: 70px;
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            padding: 0 32px;
+            gap: 12px;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            background-color: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+            margin-right: 8px;
+        }
+
+        .status-badge.connected {
+            background-color: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: currentColor;
+        }
+
+        .btn-ble {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-connect {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .btn-connect:hover { background-color: var(--primary-hover); }
+
+        .btn-disconnect {
+            background-color: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .btn-disconnect:hover:not(:disabled) {
+            background-color: var(--danger);
+            color: white;
+        }
+
+        .btn-ble:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .icon-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 1px solid var(--card-border);
+            background: var(--card-bg);
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .icon-btn:hover { background: rgba(0, 0, 0, 0.05); }
+
+        /* ==========================================================================
+           4. VIEW CONTENT & CARDS
+           ========================================================================== */
+        .content-area {
+            flex: 1;
+            padding: 0 32px 32px 32px;
+            overflow-y: auto;
+        }
+
+        .view-panel {
+            display: none;
+            height: 100%;
+        }
+
+        .view-panel.active {
+            display: block;
+        }
+
+        .dpad-view-grid {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 24px;
+            height: 100%;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            border: 1px solid var(--card-border);
+            padding: 24px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .dpad-card-content {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        .page-title {
+            font-size: 1.6rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .dpad-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px 0;
+        }
+
+        /* TACTILE CROSS D-PAD STYLING */
+        .dpad-cross {
+            display: grid;
+            grid-template-columns: repeat(3, 62px);
+            grid-template-rows: repeat(3, 62px);
+            gap: 6px;
+            background: #252836;
+            padding: 10px;
+            border-radius: 26px;
+            box-shadow: inset 0 4px 10px rgba(0,0,0,0.5), 0 10px 25px rgba(0,0,0,0.15);
+        }
+
+        .dpad-btn {
+            background: #32364A;
+            border: 1px solid #424761;
+            color: #FFFFFF;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 0 #1E202C;
+            user-select: none;
+        }
+
+        .dpad-btn:active, .dpad-btn.active {
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 #1E202C;
+            background: var(--primary);
+            border-color: #60A5FA;
+        }
+
+        .dpad-center {
+            background: #2A2D3E;
+            border-radius: 50%;
+            font-size: 1rem;
+            color: #A5B4FC;
+        }
+
+        .dpad-up    { grid-column: 2; grid-row: 1; border-radius: 14px 14px 6px 6px; }
+        .dpad-left  { grid-column: 1; grid-row: 2; border-radius: 14px 6px 6px 14px; }
+        .dpad-a     { grid-column: 2; grid-row: 2; }
+        .dpad-right { grid-column: 3; grid-row: 2; border-radius: 6px 14px 14px 6px; }
+        .dpad-down  { grid-column: 2; grid-row: 3; border-radius: 6px 6px 14px 14px; }
+
+        /* ==========================================================================
+           5. RGB HEADLIGHT & HORN SECTION
+           ========================================================================== */
+        .accessories-panel {
+            display: flex;
+            gap: 16px;
+            background: rgba(0, 0, 0, 0.03);
+            border: 1px solid var(--card-border);
+            padding: 16px;
+            border-radius: 14px;
+            margin: 16px 0;
+            align-items: center;
+        }
+
+        .rgb-box {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .accessory-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .rgb-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .color-picker-input {
+            -webkit-appearance: none;
+            border: none;
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            cursor: pointer;
+            background: none;
+        }
+
+        .color-picker-input::-webkit-color-swatch-wrapper { padding: 0; }
+        .color-picker-input::-webkit-color-swatch { border: 2px solid var(--card-border); border-radius: 50%; }
+
+        .preset-colors {
+            display: flex;
+            gap: 6px;
+        }
+
+        .color-dot {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 1px solid rgba(0,0,0,0.2);
+        }
+
+        .horn-box {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            border-left: 1px solid var(--card-border);
+            padding-left: 16px;
+        }
+
+        .btn-horn {
+            background-color: var(--warning);
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            box-shadow: 0 3px 0 #D97706;
+            user-select: none;
+        }
+
+        .btn-horn:active {
+            transform: translateY(2px);
+            box-shadow: 0 1px 0 #D97706;
+        }
+
+        /* STATUS & ACTION FOOTER */
+        .dpad-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            padding-top: 12px;
+            border-top: 1px solid var(--card-border);
+        }
+
+        .device-info p {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .device-info strong { color: var(--text-main); }
+
+        .action-btns {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-action {
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.8rem;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-run { background-color: var(--primary); color: white; }
+        .btn-stop { background-color: var(--danger); color: white; }
+        .btn-reset { background-color: transparent; border: 1px solid var(--card-border); color: var(--text-main); }
+
+        /* ==========================================================================
+           6. CONSOLE LOG PANEL & FEATURES
+           ========================================================================== */
+        .console-card {
+            background-color: var(--console-bg);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            color: var(--console-text);
+            box-shadow: var(--shadow-md);
+            height: 100%;
+            transition: all 0.3s ease;
+        }
+
+        .console-card.minimized {
+            height: 58px;
+            overflow: hidden;
+        }
+
+        .console-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            margin-bottom: 16px;
+            color: #9CA3AF;
+        }
+
+        .console-tools {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-console-tool {
+            background: #272932;
+            border: 1px solid #374151;
+            color: #9CA3AF;
+            border-radius: 6px;
+            padding: 3px 8px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .btn-console-tool:hover {
+            color: #FFFFFF;
+            background: #374151;
+        }
+
+        .console-logs {
+            flex: 1;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 0.82rem;
+            line-height: 1.6;
+            margin-bottom: 16px;
+            padding-right: 8px;
+        }
+
+        .log-entry { margin-bottom: 6px; word-break: break-all; }
+        .log-time { color: #6B7280; margin-right: 8px; }
+        .log-sys { color: #FBBF24; }
+        .log-tx { color: #60A5FA; }
+        .log-rx { color: #34D399; }
+        .log-err { color: #F87171; }
+
+        .console-input-wrapper {
+            display: flex;
+            background-color: var(--console-input-bg);
+            border-radius: 8px;
+            padding: 8px 12px;
+            border: 1px solid #374151;
+        }
+
+        .console-input-wrapper span { color: #6B7280; margin-right: 8px; }
+
+        .console-input {
+            background: transparent;
+            border: none;
+            color: #F3F4F6;
+            font-family: monospace;
+            width: 100%;
+            outline: none;
+            font-size: 0.85rem;
+        }
+
+        /* ==========================================================================
+           7. OTHER PAGES & CAMERA DETECTION STYLES
+           ========================================================================== */
+        .form-group { margin-bottom: 16px; }
+        .form-group label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--text-muted);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--card-border);
+            background-color: var(--card-bg);
+            color: var(--text-main);
+            outline: none;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            padding: 16px;
+            border-radius: 12px;
+        }
+
+        .stat-card h4 { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; }
+        .stat-card p { font-size: 1.5rem; font-weight: 700; color: var(--primary); margin-top: 8px; }
+
+        /* CAMERA STYLES */
+        .camera-container-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .webcam-view-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            border-radius: 12px;
+            min-height: 280px;
+            position: relative;
+            overflow: hidden;
+            border: 2px dashed var(--card-border);
+        }
+
+        .webcam-view-box canvas {
+            border-radius: 10px;
+            max-width: 100%;
+            height: auto;
+        }
+
+        .prediction-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 15px;
+        }
+
+        .pred-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .pred-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .pred-bar-bg {
+            height: 10px;
+            background: var(--card-border);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .pred-bar-fill {
+            height: 100%;
+            background: var(--primary);
+            width: 0%;
+            transition: width 0.15s ease-in-out;
+        }
+
+        /* SETTINGS MODAL */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.active { display: flex; }
+
+        .modal {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 24px;
+            width: 360px;
+            border: 1px solid var(--card-border);
+        }
+
+        .theme-options { display: flex; gap: 12px; margin-top: 16px; }
+        .theme-btn {
+            flex: 1;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid var(--card-border);
+            background: transparent;
+            color: var(--text-main);
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .theme-btn.active {
+            border-color: var(--primary);
+            background: rgba(37, 99, 235, 0.1);
+            color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- SIDEBAR NAVIGATION -->
+    <aside class="sidebar">
+        <div class="brand">
+            <div class="brand-icon">🤖</div>
+            <span>smartbit</span>
+        </div>
+        <ul class="nav-menu">
+            <li class="nav-item">
+                <button onclick="switchTab('dashboard', this)">
+                    <span class="nav-icon">📊</span> Dashboard
+                </button>
+            </li>
+            <li class="nav-item active">
+                <button onclick="switchTab('dpad-controller', this)">
+                    <span class="nav-icon">🎮</span> D-Pad Controller
+                </button>
+            </li>
+            <li class="nav-item">
+                <button onclick="switchTab('camera-detection', this)">
+                    <span class="nav-icon">📷</span> AI Camera
+                </button>
+            </li>
+            <li class="nav-item">
+                <button onclick="switchTab('dpad-settings', this)">
+                    <span class="nav-icon">⚙️</span> D-Pad Settings
+                </button>
+            </li>
+            <li class="nav-item">
+                <button onclick="switchTab('hardware-status', this)">
+                    <span class="nav-icon">💻</span> Hardware Status
+                </button>
+            </li>
+        </ul>
+    </aside>
+
+    <!-- MAIN CONTENT AREA -->
+    <div class="main-wrapper">
+        <!-- TOP HEADER -->
+        <header class="top-header">
+            <div class="status-badge" id="statusBadge">
+                <div class="status-dot"></div>
+                <span id="statusText">Disconnected</span>
+            </div>
+            <button id="connectBtn" class="btn-ble btn-connect" onclick="connectBLE()">Connect BLE</button>
+            <button id="disconnectBtn" class="btn-ble btn-disconnect" onclick="disconnectBLE()" disabled>Disconnect</button>
+            <button class="icon-btn" onclick="toggleSettingsModal()" title="Settings">⚙️</button>
+        </header>
+
+        <div class="content-area">
+
+            <!-- 1. DASHBOARD VIEW -->
+            <section id="dashboard" class="view-panel">
+                <h1 class="page-title">Dashboard Overview</h1>
+                <div class="card" style="margin-bottom: 20px;">
+                    <h3>Selamat Datang di platform smartbit!</h3>
+                    <p style="margin-top: 10px; color: var(--text-muted); line-height: 1.6;">
+                        <strong>smartbit</strong> adalah antarmuka web interaktif berbasis Web Bluetooth API (BLE UART) yang dirancang khusus untuk memantau, mengontrol, dan berinteraksi secara real-time dengan modul <strong>BBC micro:bit</strong>.
+                    </p>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h4>Fitur Utama</h4>
+                        <p style="font-size: 0.9rem; color: var(--text-main); margin-top: 10px;">
+                            • D-Pad Controller & Keyboard Nav<br>
+                            • AI Camera Detection (Teachable Machine)<br>
+                            • Custom RGB Headlight & Horn Control<br>
+                            • Live Console Log & Command Console
+                        </p>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Protokol BLE UART</h4>
+                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 10px;">
+                            Menggunakan Service UUID <code>6e400001-b5a3-f393-e0a9-e50e24dcca9e</code> untuk transmisi data cepat dua arah.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2. D-PAD CONTROLLER VIEW -->
+            <section id="dpad-controller" class="view-panel active">
+                <div class="dpad-view-grid">
+                    <!-- D-PAD & ACCESSORIES MAIN CARD -->
+                    <div class="card dpad-card-content">
+                        <div>
+                            <h1 class="page-title">D-Pad Controller</h1>
+                        </div>
+
+                        <!-- CROSS D-PAD UI -->
+                        <div class="dpad-wrapper">
+                            <div class="dpad-cross">
+                                <button class="dpad-btn dpad-up" id="btnUp"
+                                    onmousedown="handleDpadPress('up')" onmouseup="handleDpadRelease()"
+                                    ontouchstart="handleDpadPress('up')" ontouchend="handleDpadRelease()">︿</button>
+                                
+                                <button class="dpad-btn dpad-left" id="btnLeft"
+                                    onmousedown="handleDpadPress('left')" onmouseup="handleDpadRelease()"
+                                    ontouchstart="handleDpadPress('left')" ontouchend="handleDpadRelease()">❮</button>
+                                
+                                <div class="dpad-btn dpad-center dpad-a">A</div>
+                                
+                                <button class="dpad-btn dpad-right" id="btnRight"
+                                    onmousedown="handleDpadPress('right')" onmouseup="handleDpadRelease()"
+                                    ontouchstart="handleDpadPress('right')" ontouchend="handleDpadRelease()">❯</button>
+                                
+                                <button class="dpad-btn dpad-down" id="btnDown"
+                                    onmousedown="handleDpadPress('down')" onmouseup="handleDpadRelease()"
+                                    ontouchstart="handleDpadPress('down')" ontouchend="handleDpadRelease()">﹀</button>
+                            </div>
+                        </div>
+
+                        <!-- RGB HEADLIGHT & HORN/BUZZER PANEL -->
+                        <div class="accessories-panel">
+                            <!-- RGB Headlight Control -->
+                            <div class="rgb-box">
+                                <span class="accessory-title">RGB Headlight</span>
+                                <div class="rgb-controls">
+                                    <input type="color" id="rgbPicker" class="color-picker-input" value="#2563eb" onchange="handleRgbChange(this.value)">
+                                    <div class="preset-colors">
+                                        <div class="color-dot" style="background:#EF4444;" onclick="handleRgbChange('#EF4444')"></div>
+                                        <div class="color-dot" style="background:#10B981;" onclick="handleRgbChange('#10B981')"></div>
+                                        <div class="color-dot" style="background:#3B82F6;" onclick="handleRgbChange('#3B82F6')"></div>
+                                        <div class="color-dot" style="background:#FFFFFF;" onclick="handleRgbChange('#FFFFFF')"></div>
+                                        <div class="color-dot" style="background:#000000;" onclick="handleRgbChange('#000000')"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Horn/Buzzer Control -->
+                            <div class="horn-box">
+                                <span class="accessory-title">Horn / Buzzer</span>
+                                <button class="btn-horn" 
+                                    onmousedown="sendBLE(getCmd('horn'))" 
+                                    onmouseup="sendBLE(getCmd('hornOff'))"
+                                    ontouchstart="sendBLE(getCmd('horn'))" 
+                                    ontouchend="sendBLE(getCmd('hornOff'))">
+                                    📢 HORN
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- FOOTER CONTROL & STATUS -->
+                        <div class="dpad-footer">
+                            <div class="device-info">
+                                <p>Device: <strong id="lblDevice">Micro:bit (Disconnected)</strong></p>
+                                <p>Script: <strong id="lblScript">control_v1.py</strong></p>
+                                <p>Last Action: <strong id="lblLastAction">NONE</strong></p>
+                            </div>
+                            <div class="action-btns">
+                                <button class="btn-action btn-run" onclick="sendBLE('RUN')">RUN PROGRAM</button>
+                                <button class="btn-action btn-stop" onclick="sendBLE(getCmd('stop'))">STOP PROGRAM</button>
+                                <button class="btn-action btn-reset" onclick="sendBLE('RESET')">Reset Micro:bit</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CONSOLE LOG PANEL -->
+                    <div class="console-card" id="consoleCard">
+                        <div class="console-header">
+                            <span>CONSOLE LOG</span>
+                            <div class="console-tools">
+                                <button class="btn-console-tool" onclick="clearConsole()" title="Clear Console">🗑️ Clear</button>
+                                <button class="btn-console-tool" id="btnMinimize" onclick="toggleMinimizeConsole()" title="Minimize Console">🗕 Minimize</button>
+                            </div>
+                        </div>
+                        <div class="console-logs" id="consoleLogs">
+                            <div class="log-entry"><span class="log-time">[00:00:00]</span><span class="log-sys">System initializing... Ready for BLE connection.</span></div>
+                        </div>
+                        <div class="console-input-wrapper">
+                            <span>&gt;</span>
+                            <input type="text" class="console-input" id="consoleInput" placeholder="Enter custom command..." onkeypress="handleConsoleSubmit(event)">
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3. AI CAMERA DETECTION VIEW -->
+            <section id="camera-detection" class="view-panel">
+                <h1 class="page-title">AI Camera Detection (Teachable Machine)</h1>
+                <div class="card" style="margin-bottom: 20px;">
+                    <div class="form-group">
+                        <label for="tmUrlInput">URL Model Teachable Machine:</label>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="text" id="tmUrlInput" class="form-control" placeholder="Contoh: https://teachablemachine.withgoogle.com/models/XYZ123456/" value="">
+                            <button class="btn-action btn-run" onclick="initTeachableMachine()" style="white-space: nowrap;">⚡ Load Model</button>
+                        </div>
+                        <small style="color: var(--text-muted); margin-top: 5px; display: block;">
+                            * Masukkan link eksport model Teachable Machine (Image Model) Anda.
+                        </small>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 12px; margin-top: 10px;">
+                        <label style="display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer;">
+                            <input type="checkbox" id="chkAutoSendBLE" checked>
+                            Otomatis Kirim Hasil Prediksi ke Micro:bit via BLE
+                        </label>
+                    </div>
+                </div>
+
+                <div class="camera-container-grid">
+                    <!-- CAMERA STREAM CARD -->
+                    <div class="card">
+                        <h3 style="margin-bottom: 12px;">Camera Feed</h3>
+                        <div class="webcam-view-box" id="webcamContainer">
+                            <span id="camPlaceholder" style="color: var(--text-muted);">Kamera belum aktif. Klik "Load Model" terlebih dahulu.</span>
+                        </div>
+                        <div style="margin-top: 15px; display: flex; gap: 10px;">
+                            <button id="btnStartCam" class="btn-action btn-run" onclick="startCamera()" disabled>▶ Start Camera</button>
+                            <button id="btnStopCam" class="btn-action btn-stop" onclick="stopCamera()" disabled>⏹ Stop Camera</button>
+                        </div>
+                    </div>
+
+                    <!-- PREDICTION RESULTS CARD -->
+                    <div class="card">
+                        <h3>Hasil Prediksi Real-Time</h3>
+                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">Confidence Threshold: &gt; 80%</p>
+                        <div id="labelContainer" class="prediction-list">
+                            <span style="color: var(--text-muted); font-size: 0.9rem;">Belum ada data prediksi.</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 4. D-PAD SETTINGS VIEW -->
+            <section id="dpad-settings" class="view-panel">
+                <h1 class="page-title">D-Pad String Settings</h1>
+                <div class="card" style="max-width: 600px;">
+                    <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.9rem;">
+                        Atur nilai string data yang dikirim ke Micro:bit saat tombol ditekan atau saat AI mengenali label kelas tersebut.
+                    </p>
+                    <div class="form-group">
+                        <label>Command Maju (Up / Class 1)</label>
+                        <input type="text" id="cmdUp" class="form-control" value="FORWARD">
+                    </div>
+                    <div class="form-group">
+                        <label>Command Mundur (Down)</label>
+                        <input type="text" id="cmdDown" class="form-control" value="BACKWARD">
+                    </div>
+                    <div class="form-group">
+                        <label>Command Kiri (Left)</label>
+                        <input type="text" id="cmdLeft" class="form-control" value="TURN_LEFT">
+                    </div>
+                    <div class="form-group">
+                        <label>Command Kanan (Right)</label>
+                        <input type="text" id="cmdRight" class="form-control" value="TURN_RIGHT">
+                    </div>
+                    <div class="form-group">
+                        <label>Command Stop</label>
+                        <input type="text" id="cmdStop" class="form-control" value="STOP">
+                    </div>
+                    <div class="form-group">
+                        <label>Command Horn On / Off</label>
+                        <div style="display:flex; gap: 10px;">
+                            <input type="text" id="cmdHorn" class="form-control" value="HORN_ON" placeholder="ON">
+                            <input type="text" id="cmdHornOff" class="form-control" value="HORN_OFF" placeholder="OFF">
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 5. HARDWARE STATUS VIEW -->
+            <section id="hardware-status" class="view-panel">
+                <h1 class="page-title">Hardware Status &amp; Statistics</h1>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h4>Status Koneksi BLE</h4>
+                        <p id="statConnection" style="color: var(--danger);">DISCONNECTED</p>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Total Data Terkirim (TX)</h4>
+                        <p id="statTxCount">0 Pkt</p>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Total Data Diterima (RX)</h4>
+                        <p id="statRxCount">0 Pkt</p>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Perkiraan Sinyal BLE</h4>
+                        <p id="statSignal">- dBm</p>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </div>
+
+    <!-- SETTINGS MODAL (THEME TOGGLE) -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal">
+            <h3>Appearance Settings</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">Pilih tema tampilan website</p>
+            <div class="theme-options">
+                <button class="theme-btn active" id="btnThemeLight" onclick="setTheme('light')">☀️ Light</button>
+                <button class="theme-btn" id="btnThemeDark" onclick="setTheme('dark')">🌙 Dark</button>
+            </div>
+            <button class="btn-action btn-reset" style="width: 100%; margin-top: 20px;" onclick="toggleSettingsModal()">Close</button>
+        </div>
+    </div>
+
+    <!-- SCRIPT CONTROLLER -->
+    <script>
+        /* ==========================================================================
+           1. BLE UART CONFIGURATION & STATE
+           ========================================================================== */
+        const NUS_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+        const RX_CHAR_UUID      = '6e400002-b5a3-f393-e0a9-e50e24dcca9e'; // Web -> Micro:bit (Write)
+        const TX_CHAR_UUID      = '6e400003-b5a3-f393-e0a9-e50e24dcca9e'; // Micro:bit -> Web (Notify)
+
+        let bleDevice = null;
+        let gattServer = null;
+        let rxCharacteristic = null;
+        let txCharacteristic = null;
+
+        let txCount = 0;
+        let rxCount = 0;
+        let activeKeys = {};
+
+        /* Queue / Antrean Penulisan BLE untuk Mencegah Bentrokan GATT */
+        let bleWriteQueue = [];
+        let isWritingBLE = false;
+
+        /* ==========================================================================
+           2. BLE CONNECTION MANAGEMENT
+           ========================================================================== */
+        async function connectBLE() {
+            if (!navigator.bluetooth) {
+                logToConsole('Web Bluetooth API tidak didukung di browser/konteks ini (Pastikan menggunakan HTTPS atau Chrome/Edge).', 'err');
+                alert('Browser Anda tidak mendukung Web Bluetooth API atau halaman belum diakses via HTTPS.');
+                return;
+            }
+
+            try {
+                logToConsole('Mencari perangkat BLE BBC micro:bit...', 'sys');
+                
+                // Menggunakan filter fleksibel untuk kompatibilitas berbagai firmware
+                bleDevice = await navigator.bluetooth.requestDevice({
+                    filters: [
+                        { namePrefix: 'BBC micro:bit' },
+                        { namePrefix: 'micro:bit' },
+                        { services: [NUS_SERVICE_UUID] }
+                    ],
+                    optionalServices: [NUS_SERVICE_UUID]
+                });
+
+                bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+
+                logToConsole(`Menghubungkan ke ${bleDevice.name || 'Micro:bit'}...`, 'sys');
+                gattServer = await bleDevice.gatt.connect();
+
+                logToConsole('Mendapatkan Service UART...', 'sys');
+                const service = await gattServer.getPrimaryService(NUS_SERVICE_UUID);
+
+                logToConsole('Mendapatkan Karakteristik TX & RX...', 'sys');
+                try {
+                    rxCharacteristic = await service.getCharacteristic(RX_CHAR_UUID);
+                } catch (e) {
+                    logToConsole('Gagal mendapatkan RX characteristic: ' + e.message, 'err');
+                }
+
+                try {
+                    txCharacteristic = await service.getCharacteristic(TX_CHAR_UUID);
+                    if (txCharacteristic) {
+                        await txCharacteristic.startNotifications();
+                        txCharacteristic.addEventListener('characteristicvaluechanged', handleRxData);
+                    }
+                } catch (e) {
+                    logToConsole('Peringatan TX characteristic (Notify): ' + e.message, 'sys');
+                }
+
+                updateConnectionUI(true);
+                logToConsole('Terhubung ke Micro:bit via BLE UART!', 'sys');
+            } catch (error) {
+                logToConsole(`Koneksi Gagal: ${error.message}`, 'err');
+            }
+        }
+
+        function disconnectBLE() {
+            if (bleDevice && bleDevice.gatt.connected) {
+                bleDevice.gatt.disconnect();
+            }
+        }
+
+        function onDisconnected() {
+            rxCharacteristic = null;
+            txCharacteristic = null;
+            gattServer = null;
+            bleWriteQueue = [];
+            isWritingBLE = false;
+
+            updateConnectionUI(false);
+            logToConsole('Terputus dari perangkat BLE.', 'err');
+        }
+
+        function updateConnectionUI(isConnected) {
+            const statusBadge = document.getElementById('statusBadge');
+            const statusText = document.getElementById('statusText');
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            const lblDevice = document.getElementById('lblDevice');
+            const statConnection = document.getElementById('statConnection');
+
+            if (isConnected) {
+                statusBadge.classList.add('connected');
+                statusText.textContent = 'Connected';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                lblDevice.textContent = (bleDevice && bleDevice.name) ? bleDevice.name : 'Micro:bit v2';
+                statConnection.textContent = 'CONNECTED';
+                statConnection.style.color = 'var(--success)';
+            } else {
+                statusBadge.classList.remove('connected');
+                statusText.textContent = 'Disconnected';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                lblDevice.textContent = 'Micro:bit (Disconnected)';
+                statConnection.textContent = 'DISCONNECTED';
+                statConnection.style.color = 'var(--danger)';
+            }
+        }
+
+        /* Fungsi Mengirim Perintah dengan Sistem Antrean Asynchronous (Mencegah GATT Operation Conflict) */
+        async function sendBLE(data) {
+            if (!data) return;
+
+            logToConsole(`TX: ${data}`, 'tx');
+            document.getElementById('lblLastAction').textContent = data;
+
+            if (rxCharacteristic && bleDevice && bleDevice.gatt && bleDevice.gatt.connected) {
+                bleWriteQueue.push(data);
+                processWriteQueue();
+            }
+        }
+
+        async function processWriteQueue() {
+            if (isWritingBLE || bleWriteQueue.length === 0) return;
+            isWritingBLE = true;
+
+            while (bleWriteQueue.length > 0) {
+                const data = bleWriteQueue.shift();
+                try {
+                    const encoder = new TextEncoder();
+                    const buffer = encoder.encode(data + '\n');
+
+                    // Kompatibilitas dengan berbagai versi browser & spec Web Bluetooth API
+                    if (rxCharacteristic.writeValueWithoutResponse) {
+                        await rxCharacteristic.writeValueWithoutResponse(buffer);
+                    } else if (rxCharacteristic.writeValueWithResponse) {
+                        await rxCharacteristic.writeValueWithResponse(buffer);
+                    } else if (rxCharacteristic.writeValue) {
+                        await rxCharacteristic.writeValue(buffer);
+                    } else {
+                        throw new Error('Metode penulisan Bluetooth tidak ditemukan pada karakteristik.');
+                    }
+
+                    txCount++;
+                    document.getElementById('statTxCount').textContent = `${txCount} Pkt`;
+                } catch (err) {
+                    logToConsole(`Gagal Mengirim Data: ${err.message}`, 'err');
+                }
+            }
+
+            isWritingBLE = false;
+        }
+
+        function handleRxData(event) {
+            const decoder = new TextDecoder('utf-8');
+            const value = decoder.decode(event.target.value);
+            rxCount++;
+            document.getElementById('statRxCount').textContent = `${rxCount} Pkt`;
+            logToConsole(`RX: ${value.trim()}`, 'rx');
+        }
+
+        /* ==========================================================================
+           3. D-PAD & HARDWARE CONTROL
+           ========================================================================== */
+        function getCmd(key) {
+            const map = {
+                up: 'cmdUp',
+                down: 'cmdDown',
+                left: 'cmdLeft',
+                right: 'cmdRight',
+                stop: 'cmdStop',
+                horn: 'cmdHorn',
+                hornOff: 'cmdHornOff'
+            };
+            const input = document.getElementById(map[key]);
+            return input ? input.value : '';
+        }
+
+        function handleDpadPress(dir) {
+            const btnMap = {
+                up: 'btnUp',
+                down: 'btnDown',
+                left: 'btnLeft',
+                right: 'btnRight'
+            };
+            const btn = document.getElementById(btnMap[dir]);
+            if (btn) btn.classList.add('active');
+            sendBLE(getCmd(dir));
+        }
+
+        function handleDpadRelease() {
+            ['btnUp', 'btnDown', 'btnLeft', 'btnRight'].forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) btn.classList.remove('active');
+            });
+            sendBLE(getCmd('stop'));
+        }
+
+        function handleRgbChange(hexColor) {
+            document.getElementById('rgbPicker').value = hexColor;
+            sendBLE(`RGB:${hexColor}`);
+        }
+
+        /* Keyboard Listeners (W, A, S, D & Arrow Keys) */
+        window.addEventListener('keydown', (e) => {
+            if (e.repeat || document.activeElement.tagName === 'INPUT') return;
+
+            const key = e.key.toLowerCase();
+            if (['w', 'arrowup'].includes(key)) {
+                activeKeys[key] = true;
+                handleDpadPress('up');
+            } else if (['s', 'arrowdown'].includes(key)) {
+                activeKeys[key] = true;
+                handleDpadPress('down');
+            } else if (['a', 'arrowleft'].includes(key)) {
+                activeKeys[key] = true;
+                handleDpadPress('left');
+            } else if (['d', 'arrowright'].includes(key)) {
+                activeKeys[key] = true;
+                handleDpadPress('right');
+            } else if (key === ' ') {
+                sendBLE(getCmd('horn'));
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (document.activeElement.tagName === 'INPUT') return;
+
+            const key = e.key.toLowerCase();
+            if (['w', 's', 'a', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+                delete activeKeys[key];
+                if (Object.keys(activeKeys).length === 0) {
+                    handleDpadRelease();
+                }
+            } else if (key === ' ') {
+                sendBLE(getCmd('hornOff'));
+            }
+        });
+
+        /* ==========================================================================
+           4. TEACHABLE MACHINE & CAMERA DETECTION LOGIC
+           ========================================================================== */
+        let tmModel = null;
+        let webcam = null;
+        let maxPredictions = 0;
+        let isCamRunning = false;
+        let lastSentPredictedClass = "";
+        let lastBLETime = 0;
+
+        async function initTeachableMachine() {
+            let urlInput = document.getElementById('tmUrlInput').value.trim();
+            if (!urlInput) {
+                alert('Silakan masukkan URL Model Teachable Machine terlebih dahulu!');
+                return;
+            }
+
+            if (!urlInput.endsWith('/')) {
+                urlInput += '/';
+            }
+
+            const modelURL = urlInput + 'model.json';
+            const metadataURL = urlInput + 'metadata.json';
+
+            try {
+                logToConsole('Memuat Model Teachable Machine...', 'sys');
+                tmModel = await tmImage.load(modelURL, metadataURL);
+                maxPredictions = tmModel.getTotalClasses();
+
+                logToConsole(`Model Berhasil Dimuat! Jumlah Kelas: ${maxPredictions}`, 'sys');
+                document.getElementById('btnStartCam').disabled = false;
+                
+                const labelContainer = document.getElementById('labelContainer');
+                labelContainer.innerHTML = '';
+                for (let i = 0; i < maxPredictions; i++) {
+                    const classTitle = tmModel.getClassLabels()[i];
+                    const item = document.createElement('div');
+                    item.className = 'pred-item';
+                    item.innerHTML = `
+                        <div class="pred-header">
+                            <span>${classTitle}</span>
+                            <span id="pred-val-${i}">0%</span>
+                        </div>
+                        <div class="pred-bar-bg">
+                            <div class="pred-bar-fill" id="pred-bar-${i}"></div>
+                        </div>
+                    `;
+                    labelContainer.appendChild(item);
+                }
+
+                alert('Model berhasil dimuat! Klik "Start Camera" untuk memulai deteksi.');
+            } catch (err) {
+                logToConsole(`Gagal Memuat Model TM: ${err.message}`, 'err');
+                alert('Gagal memuat model. Pastikan URL benar dan publik.');
+            }
+        }
+
+        async function startCamera() {
+            if (!tmModel) {
+                alert('Model belum dimuat!');
+                return;
+            }
+
+            const flip = true;
+            webcam = new tmImage.Webcam(320, 240, flip);
+            await webcam.setup();
+            await webcam.play();
+            isCamRunning = true;
+
+            const webcamContainer = document.getElementById('webcamContainer');
+            webcamContainer.innerHTML = '';
+            webcamContainer.appendChild(webcam.canvas);
+
+            document.getElementById('btnStartCam').disabled = true;
+            document.getElementById('btnStopCam').disabled = false;
+            logToConsole('Kamera diaktifkan & deteksi real-time dimulai.', 'sys');
+
+            window.requestAnimationFrame(cameraLoop);
+        }
+
+        async function cameraLoop() {
+            if (!isCamRunning) return;
+
+            webcam.update();
+            await predictCamera();
+            window.requestAnimationFrame(cameraLoop);
+        }
+
+        async function predictCamera() {
+            if (!tmModel || !webcam) return;
+
+            const prediction = await tmModel.predict(webcam.canvas);
+            let highestProb = 0;
+            let highestClass = "";
+
+            for (let i = 0; i < maxPredictions; i++) {
+                const prob = prediction[i].probability;
+                const percentage = (prob * 100).toFixed(0);
+
+                const barFill = document.getElementById(`pred-bar-${i}`);
+                const valTxt = document.getElementById(`pred-val-${i}`);
+
+                if (barFill) barFill.style.width = percentage + '%';
+                if (valTxt) valTxt.textContent = percentage + '%';
+
+                if (prob > highestProb) {
+                    highestProb = prob;
+                    highestClass = prediction[i].className;
+                }
+            }
+
+            const autoSendChecked = document.getElementById('chkAutoSendBLE').checked;
+            const now = Date.now();
+
+            if (autoSendChecked && highestProb >= 0.80) { // Threshold minimal 80% confidence
+                // Hubungkan kelas AI (seperti up, down, left, right) ke pengaturan D-Pad jika sesuai
+                const mappedCmd = getCmd(highestClass.toLowerCase()) || highestClass;
+                if (highestClass !== lastSentPredictedClass || (now - lastBLETime > 400)) {
+                    lastSentPredictedClass = highestClass;
+                    lastBLETime = now;
+                    sendBLE(mappedCmd);
+                }
+            }
+        }
+
+        function stopCamera() {
+            if (webcam) {
+                webcam.stop();
+            }
+            isCamRunning = false;
+            document.getElementById('webcamContainer').innerHTML = `
+                <span id="camPlaceholder" style="color: var(--text-muted);">Kamera dihentikan.</span>
+            `;
+            document.getElementById('btnStartCam').disabled = false;
+            document.getElementById('btnStopCam').disabled = true;
+            logToConsole('Kamera dihentikan.', 'sys');
+        }
+
+        /* ==========================================================================
+           5. CONSOLE & NAVIGATION HELPERS
+           ========================================================================== */
+        function switchTab(tabId, buttonEl) {
+            document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+
+            document.getElementById(tabId).classList.add('active');
+            if (buttonEl) {
+                buttonEl.parentElement.classList.add('active');
+            }
+        }
+
+        function toggleSettingsModal() {
+            document.getElementById('settingsModal').classList.toggle('active');
+        }
+
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            document.getElementById('btnThemeLight').classList.toggle('active', theme === 'light');
+            document.getElementById('btnThemeDark').classList.toggle('active', theme === 'dark');
+        }
+
+        function logToConsole(message, type = 'sys') {
+            const logsContainer = document.getElementById('consoleLogs');
+            const time = new Date().toTimeString().split(' ')[0];
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+
+            let classType = 'log-sys';
+            if (type === 'tx') classType = 'log-tx';
+            if (type === 'rx') classType = 'log-rx';
+            if (type === 'err') classType = 'log-err';
+
+            entry.innerHTML = `<span class="log-time">[${time}]</span><span class="${classType}">${message}</span>`;
+            logsContainer.appendChild(entry);
+            logsContainer.scrollTop = logsContainer.scrollHeight;
+        }
+
+        function clearConsole() {
+            document.getElementById('consoleLogs').innerHTML = '';
+        }
+
+        function toggleMinimizeConsole() {
+            const card = document.getElementById('consoleCard');
+            const btn = document.getElementById('btnMinimize');
+            card.classList.toggle('minimized');
+            btn.textContent = card.classList.contains('minimized') ? '🗖 Expand' : '🗕 Minimize';
+        }
+
+        function handleConsoleSubmit(event) {
+            if (event.key === 'Enter') {
+                const input = document.getElementById('consoleInput');
+                if (input.value.trim() !== '') {
+                    sendBLE(input.value.trim());
+                    input.value = '';
+                }
+            }
+        }
+    </script>
+</body>
+</html>
